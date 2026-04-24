@@ -24,6 +24,34 @@ menu = st.sidebar.selectbox(
     "Pilih Analisis",
     ["EDA Kategori", "EDA State", "RFM Analysis"]
 )
+st.sidebar.subheader("Filter Data")
+
+min_date = df["order_purchase_timestamp"].min()
+max_date = df["order_purchase_timestamp"].max()
+
+date_range = st.sidebar.date_input(
+    "Pilih Rentang Tanggal",
+    [min_date, max_date]
+)
+st.sidebar.subheader("Filter Data")
+
+state = st.sidebar.selectbox(
+    "Pilih State",
+    ["All"] + list(df["customer_state"].unique())
+)
+df_filtered = df.copy()
+
+# filter state
+if state != "All":
+    df_filtered = df_filtered[df_filtered["customer_state"] == state]
+
+# filter tanggal (kalau ada)
+if len(date_range) == 2:
+    df_filtered = df_filtered[
+        (df_filtered["order_purchase_timestamp"] >= pd.to_datetime(date_range[0])) &
+        (df_filtered["order_purchase_timestamp"] <= pd.to_datetime(date_range[1]))
+    ]
+    st.write("Jumlah data setelah filter:", df_filtered.shape)
 
 # =====================
 # KPI GLOBAL
@@ -32,9 +60,9 @@ st.subheader("📌 Ringkasan Data")
 
 col1, col2, col3 = st.columns(3)
 
-col1.metric("Total Transaksi", df["order_id"].nunique())
-col2.metric("Total Customer", df["customer_unique_id"].nunique())
-col3.metric("Total Revenue", f"{int((df['price']+df['freight_value']).sum()):,}")
+col1.metric("Total Transaksi", df_filtered["order_id"].nunique())
+col2.metric("Total Customer", df_filtered["customer_unique_id"].nunique())
+col3.metric("Total Revenue", f"{int((df_filtered['price']+df_filtered['freight_value']).sum()):,}")
 
 st.markdown("---")
 
@@ -44,7 +72,7 @@ st.markdown("---")
 if menu == "EDA Kategori":
     st.header("📦 Analisis Kategori Produk")
 
-    kategori_df = df.groupby("product_category_name_english")["order_item_id"] \
+    kategori_df = df_filtered.groupby("product_category_name_english")["order_item_id"]\
         .count().sort_values(ascending=False)
 
     total = kategori_df.sum()
@@ -94,7 +122,7 @@ if menu == "EDA Kategori":
 elif menu == "EDA State":
     st.header("🌍 Analisis State")
 
-    state_df = df.groupby("customer_state")["order_id"] \
+    state_df = df_filtered.groupby("customer_state")["order_id"] \
         .nunique().sort_values(ascending=False)
 
     total = state_df.sum()
@@ -142,11 +170,11 @@ elif menu == "EDA State":
 elif menu == "RFM Analysis":
     st.header("👤 RFM Analysis")
 
-    df["total_price"] = df["price"] + df["freight_value"]
+    df_filtered["total_price"] = df_filtered["price"] + df_filtered["freight_value"]
 
-    snapshot_date = df["order_purchase_timestamp"].max() + pd.Timedelta(days=1)
+    snapshot_date = df_filtered["order_purchase_timestamp"].max() + pd.Timedelta(days=1)
 
-    rfm = df.groupby("customer_unique_id").agg({
+    rfm = df_filtered.groupby("customer_unique_id").agg({
         "order_purchase_timestamp": lambda x: (snapshot_date - x.max()).days,
         "order_id": "nunique",
         "total_price": "sum"
